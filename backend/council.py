@@ -4,6 +4,34 @@ from typing import List, Dict, Any, Tuple
 from .openrouter import query_models_parallel, query_model
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
 
+#add system prompt
+from .system_prompt import CHAIRMAN_SYSTEM_PROMPT, PHILOSOPHIERS_SYSTEM_PROMPT
+
+# region agent log helper
+# def _agent_debug_log(hypothesis_id: str, location: str, message: str, data: Dict[str, Any], run_id: str = "initial") -> None:
+#     """
+#     Lightweight debug logger writing NDJSON lines for this debug session.
+#     """
+#     try:
+#         import json
+#         import time
+
+#         payload = {
+#             "sessionId": "debug-session",
+#             "runId": run_id,
+#             "hypothesisId": hypothesis_id,
+#             "location": location,
+#             "message": message,
+#             "data": data,
+#             "timestamp": int(time.time() * 1000),
+#         }
+#         with open("/media/hungmtp/DATA1/Git_clone/phylosophy-llm-council/.cursor/debug.log", "a", encoding="utf-8") as f:
+#             f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+#     except Exception:
+#         # Debug logging must never break main logic
+#         pass
+# endregion
+
 
 async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
     """
@@ -15,9 +43,28 @@ async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
     Returns:
         List of dicts with 'model' and 'response' keys
     """
-    messages = [{"role": "user", "content": user_query}]
+    # Build per-model messages with philosopher-specific system prompts
+    messages: List[List[Dict[str, str]]] = []
+    for _, philosophier_system_prompt in PHILOSOPHIERS_SYSTEM_PROMPT.items():
+        messages.append([
+            {"role": "system", "content": philosophier_system_prompt},
+            {"role": "user", "content": user_query},
+        ])
 
-    # Query all models in parallel
+    # region agent log
+    # if messages:
+    #     _agent_debug_log(
+    #         hypothesis_id="H1",
+    #         location="council.stage1_collect_responses",
+    #         message="Stage 1 messages built",
+    #         data={
+    #             "messages_count": len(messages),
+    #             "first_message_roles": [m["role"] for m in messages[0]],
+    #         },
+    #     )
+    # endregion
+
+    # Query all models in parallel (one message list per model)
     responses = await query_models_parallel(COUNCIL_MODELS, messages)
 
     # Format results
@@ -92,7 +139,30 @@ FINAL RANKING:
 
 Now provide your evaluation and ranking:"""
 
-    messages = [{"role": "user", "content": ranking_prompt}]
+    # Build per-model messages for ranking stage, each with a system prompt
+    stage2_system_prompt = (
+        "You are a rigorous philosophical council member evaluating anonymized peer responses. "
+        "Follow the ranking instructions exactly and output the FINAL RANKING section in the required format."
+    )
+    messages: List[List[Dict[str, str]]] = []
+    for _ in COUNCIL_MODELS:
+        messages.append([
+            {"role": "system", "content": stage2_system_prompt},
+            {"role": "user", "content": ranking_prompt},
+        ])
+
+    # region agent log
+    # if messages:
+    #     _agent_debug_log(
+    #         hypothesis_id="H2",
+    #         location="council.stage2_collect_rankings",
+    #         message="Stage 2 messages built",
+    #         data={
+    #             "messages_count": len(messages),
+    #             "first_message_roles": [m["role"] for m in messages[0]],
+    #         },
+    #     )
+    # endregion
 
     # Get rankings from all council models in parallel
     responses = await query_models_parallel(COUNCIL_MODELS, messages)
@@ -154,9 +224,24 @@ Your task as Chairman is to synthesize all of this information into a single, co
 - The peer rankings and what they reveal about response quality
 - Any patterns of agreement or disagreement
 
-Provide a clear, well-reasoned final answer that represents the council's collective wisdom:"""
+Provide a clear, well-reasoned final answer that represents the council's collective wisdom.
+IMPORTANT: Answer in Vietnamese."""
 
-    messages = [{"role": "user", "content": chairman_prompt}]
+    messages = [
+        {"role": "system", "content": CHAIRMAN_SYSTEM_PROMPT},
+        {"role": "user", "content": chairman_prompt},
+    ]
+
+    # region agent log
+    # _agent_debug_log(
+    #     hypothesis_id="H3",
+    #     location="council.stage3_synthesize_final",
+    #     message="Stage 3 chairman messages built",
+    #     data={
+    #         "messages_roles": [m["role"] for m in messages],
+    #     },
+    # )
+    # endregion
 
     # Query the chairman model
     response = await query_model(CHAIRMAN_MODEL, messages)
@@ -274,9 +359,9 @@ Title:"""
 
     messages = [{"role": "user", "content": title_prompt}]
 
-    # Use gemini-2.5-flash for title generation (fast and cheap)
-    response = await query_model("google/gemini-2.5-flash", messages, timeout=30.0)
-
+    # Use gemini-3-4b for title generation (fast and cheap)
+    response = await query_model("google/gemma-3-4b-it:free", messages, timeout=30.0)
+    print("Im heree")
     if response is None:
         # Fallback to a generic title
         return "New Conversation"
