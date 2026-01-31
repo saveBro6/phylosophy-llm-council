@@ -1,8 +1,9 @@
 """FastAPI backend for LLM Council."""
 
 from fastapi import FastAPI, HTTPException
+import logging
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel
 from typing import List, Dict, Any
 import uuid
@@ -11,8 +12,26 @@ import asyncio
 
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_cross_debate, stage3_synthesize_final
+from . import elevenlabs_tts
+from .config import ELEVENLABS_API_KEY, ELEVENLABS_VOICE_IDS
+from .tts_config import MEMBER_IDS_ORDER
 
 app = FastAPI(title="LLM Council API")
+logger = logging.getLogger("backend.main")
+
+
+@app.on_event("startup")
+async def startup_event():
+    # Log ElevenLabs config presence for debugging 503 errors from /api/tts
+    try:
+        from .config import ELEVENLABS_API_KEY, ELEVENLABS_VOICE_IDS
+
+        key_present = bool(ELEVENLABS_API_KEY)
+        voices_present = bool(ELEVENLABS_VOICE_IDS)
+        voices_count = len(ELEVENLABS_VOICE_IDS) if voices_present else 0
+        logger.info("Startup: ELEVENLABS_API_KEY present=%s ELEVENLABS_VOICE_IDS_count=%d", key_present, voices_count)
+    except Exception as e:
+        logger.exception("Error checking ElevenLabs config at startup: %s", str(e))
 
 # Enable CORS for local development
 app.add_middleware(
@@ -32,6 +51,12 @@ class CreateConversationRequest(BaseModel):
 class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
     content: str
+
+
+class TtsRequest(BaseModel):
+    """Request for TTS (ElevenLabs, Vietnamese output)."""
+    text: str
+    member_id: str
 
 
 class ConversationMetadata(BaseModel):
@@ -54,6 +79,43 @@ class Conversation(BaseModel):
 async def root():
     """Health check endpoint."""
     return {"status": "ok", "service": "LLM Council API"}
+
+
+TTS_MAX_TEXT_LENGTH = 5000
+
+
+@app.post("/api/tts")
+async def tts_synthesize(request: TtsRequest):
+    """
+    Synthesize speech via ElevenLabs (Vietnamese output).
+    Requires ELEVENLABS_API_KEY and ELEVENLABS_VOICE_IDS in env.
+    """
+    text = (request.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is required and must be non-empty")
+    if len(text) > TTS_MAX_TEXT_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"text must be at most {TTS_MAX_TEXT_LENGTH} characters",
+        )
+    if request.member_id not in MEMBER_IDS_ORDER:
+        raise HTTPException(
+            status_code=400,
+            detail="member_id must be one of: lenin, plato, descartes, nietzsche, confucius",
+        )
+    if not ELEVENLABS_API_KEY or not ELEVENLABS_VOICE_IDS:
+        raise HTTPException(
+            status_code=503,
+            detail="TTS not configured (missing ELEVENLABS_API_KEY or ELEVENLABS_VOICE_IDS)",
+        )
+    audio_bytes = await elevenlabs_tts.synthesize(text, request.member_id)
+    if audio_bytes is None:
+        logger.error("TTS synthesis returned no audio for member_id=%s text_len=%d", request.member_id, len(text))
+        raise HTTPException(
+            status_code=502,
+            detail="TTS synthesis failed (see server logs for details)",
+        )
+    return Response(content=audio_bytes, media_type="audio/mpeg")
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])

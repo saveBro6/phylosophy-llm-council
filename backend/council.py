@@ -47,7 +47,7 @@ async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
     messages: List[List[Dict[str, str]]] = []
     for _, philosophier_system_prompt in PHILOSOPHIERS_SYSTEM_PROMPT.items():
         messages.append([
-            {"role": "system", "content": philosophier_system_prompt + "\nIMPORTANT: Answer in Vietnamese."},
+            {"role": "system", "content": philosophier_system_prompt + "\nIMPORTANT: Answer ONLY in Vietnamese."},
             {"role": "user", "content": user_query},
         ])
 
@@ -68,12 +68,10 @@ async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
     philosopher_names = list(PHILOSOPHIERS_SYSTEM_PROMPT.keys())
     responses = await query_models_parallel(COUNCIL_MODELS, messages)
 
-    # Format results: philosophier = key from PHILOSOPHIERS_SYSTEM_PROMPT
+    # Format results: philosophier = key from PHILOSOPHIERS_SYSTEM_PROMPT (order preserved)
     stage1_results = []
-    for i, model in enumerate(COUNCIL_MODELS):
-        if i >= len(philosopher_names):
-            break
-        response = responses.get(model)
+    for i in range(min(len(philosopher_names), len(responses))):
+        response = responses[i]
         if response is not None:
             stage1_results.append({
                 "philosophier": philosopher_names[i],
@@ -154,10 +152,8 @@ async def stage2_cross_debate(
     responses = await query_models_parallel(COUNCIL_MODELS, messages)
 
     stage2_results = []
-    for i, model in enumerate(COUNCIL_MODELS):
-        if i >= len(philosopher_names):
-            break
-        response = responses.get(model)
+    for i in range(min(len(philosopher_names), len(responses))):
+        response = responses[i]
         if response is not None:
             stage2_results.append({
                 "philosophier": philosopher_names[i],
@@ -210,7 +206,7 @@ Your task as Chairman is to synthesize all of this into a single, comprehensive,
 - Any patterns of agreement or ideological clash
 
 Provide a clear, well-reasoned final answer that represents the council's collective wisdom after the debate.
-IMPORTANT: Answer in Vietnamese."""
+IMPORTANT: Answer ONLY in Vietnamese. DO NOT USE MARKDOWN FORMAT. Just output the answer directly."""
 
     messages = [
         {"role": "system", "content": CHAIRMAN_SYSTEM_PROMPT},

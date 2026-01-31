@@ -56,7 +56,7 @@ async def query_model(
 async def query_models_parallel(
     models: List[str],
     messages: List[List[Dict[str, str]]]
-) -> Dict[str, Optional[Dict[str, Any]]]:
+) -> List[Optional[Dict[str, Any]]]:
     """
     Query multiple models in parallel.
 
@@ -65,15 +65,11 @@ async def query_models_parallel(
         messages: List of per-model message lists to send to each model
 
     Returns:
-        Dict mapping model identifier to response dict (or None if failed)
+        List of response dicts (or None if failed) in the same order as models.
+        Preserves order when the same model is used multiple times.
     """
     import asyncio
 
-    # Create tasks for all models
     tasks = [query_model(models[i], messages[i]) for i in range(len(models))]
-
-    # Wait for all to complete
     responses = await asyncio.gather(*tasks)
-
-    # Map models to their responses
-    return {model: response for model, response in zip(models, responses)}
+    return list(responses)

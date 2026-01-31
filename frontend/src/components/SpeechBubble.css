@@ -1,0 +1,94 @@
+.speech-bubble-root {
+  position: absolute;
+  min-width: 260px;
+  max-width: 420px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(10, 10, 10, 0.9);
+  color: #f5f5f5;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+  transform: translate(-50%, -105%);
+  z-index: 10;
+  pointer-events: auto;
+}
+
+/* Lenin (chairman): anchor top so bubble grows downward; taller body */
+.speech-bubble-root.speech-bubble-chairman {
+  transform: translate(-50%, 0);
+}
+
+.speech-bubble-root.speech-bubble-chairman .speech-bubble-body {
+  max-height: 350px;
+}
+
+.speech-bubble-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.speech-bubble-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.speech-bubble-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.speech-bubble-icon-button {
+  border: none;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.speech-bubble-icon-button:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.speech-bubble-icon-button.active {
+  background: rgba(74, 144, 226, 0.8);
+}
+
+.speech-bubble-body {
+  flex: 1;
+  min-height: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-size: 14px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.speech-bubble-placeholder {
+  font-style: italic;
+  color: #bdbdbd;
+}
+
+.speech-bubble-text {
+  padding: 0;
+}
+
+@media (max-width: 768px) {
+  .speech-bubble-root {
+    max-width: 90vw;
+    max-height: 60vh;
+    transform: translate(-50%, -102%);
+  }
+
+  .speech-bubble-root.speech-bubble-chairman {
+    transform: translate(-50%, 0);
+  }
+}
+

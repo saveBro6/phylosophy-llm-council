@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
-import ChatInterface from './components/ChatInterface';
+import CouncilCourtroom from './components/CouncilCourtroom';
+import { CouncilProvider } from './context/CouncilContext';
 import { api } from './api';
 import './App.css';
 
@@ -189,11 +190,12 @@ function App() {
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
       />
-      <ChatInterface
-        conversation={currentConversation}
-        onSendMessage={handleSendMessage}
-        isLoading={isLoading}
-      />
+      <CouncilProvider conversation={currentConversation}>
+        <CouncilCourtroom
+          onSendMessage={handleSendMessage}
+          isLoading={isLoading}
+        />
+      </CouncilProvider>
     </div>
   );
 }

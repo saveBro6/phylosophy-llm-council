@@ -112,4 +112,25 @@ export const api = {
       }
     }
   },
+
+  /**
+   * Request TTS audio from backend (ElevenLabs, Vietnamese output).
+   * @param {string} text - Text to synthesize
+   * @param {string} memberId - Council member id (lenin, plato, descartes, nietzsche, confucius)
+   * @returns {Promise<Blob>} Audio blob (mp3)
+   */
+  async requestTts(text, memberId) {
+    const response = await fetch(`${API_BASE}/api/tts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text, member_id: memberId }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(err.detail || 'TTS request failed');
+    }
+    return response.blob();
+  },
 };
