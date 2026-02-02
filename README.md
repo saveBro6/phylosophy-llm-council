@@ -1,18 +1,20 @@
-# LLM Council
+# Philosophy LLM Council
 
-![llmcouncil](header.jpg)
+![llmcouncil](header.png)
 
-The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses OpenRouter to send your query to multiple LLMs, it then asks them to review and rank each other's work, and finally a Chairman LLM produces the final response.
+A web application that simulates a philosophical council where multiple LLMs roleplay as historical philosophers (e.g., Plato, Descartes, Nietzsche, Confucius), engaging in debate and critique. A chairman LLM (Lenin) synthesizes their arguments and produces a final answer rooted in dialectical-materialist analysis.
 
-In a bit more detail, here is what happens when you submit a query:
+Instead of asking a single LLM provider for answers, this project creates a council of philosophical personas that collectively explore questions from diverse intellectual traditions, then adjudicates between them.
 
-1. **Stage 1: First opinions**. The user query is given to all LLMs individually, and the responses are collected. The individual responses are shown in a "tab view", so that the user can inspect them all one by one.
-2. **Stage 2: Review**. Each individual LLM is given the responses of the other LLMs. Under the hood, the LLM identities are anonymized so that the LLM can't play favorites when judging their outputs. The LLM is asked to rank them in accuracy and insight.
-3. **Stage 3: Final response**. The designated Chairman of the LLM Council takes all of the model's responses and compiles them into a single final answer that is presented to the user.
+## How it works
 
-## Vibe Code Alert
+When you submit a query, the system performs three stages of deliberation:
 
-This project was 99% vibe coded as a fun Saturday hack because I wanted to explore and evaluate a number of LLMs side by side in the process of [reading books together with LLMs](https://x.com/karpathy/status/1990577951671509438). It's nice and useful to see multiple responses side by side, and also the cross-opinions of all LLMs on each other's outputs. I'm not going to support it in any way, it's provided here as is for other people's inspiration and I don't intend to improve it. Code is ephemeral now and libraries are over, ask your LLM to change it in whatever way you like.
+1. **Stage 1: Philosophical Perspectives**. The user query is given to each philosopher-LLM individually, configured with system prompts that encode their distinctive doctrines, rhetorical style, and historical context. Responses are displayed in a tab view so users can inspect each philosopher's unique viewpoint.
+
+2. **Stage 2: Critique**. Each philosopher is presented with the anonymized responses of the others and asked to critique them—identifying tensions, contradictions, logical flaws, or historical/philosophical objections. Critiques are parsed and displayed alongside raw text for transparency.
+
+3. **Stage 3: Synthesis & Judgement**. Lenin (the chairman) receives all Stage 1 responses and Stage 2 critiques, identifies errors and insights, contrasts them with dialectical materialism, and produces the final answer with reasoned justification.
 
 ## Setup
 
@@ -32,15 +34,24 @@ npm install
 cd ..
 ```
 
-### 2. Configure API Key
+### 2. Configure API Keys
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root (you can use `.env.example` as a template):
 
 ```bash
+# Required: OpenRouter API key for LLM queries
 OPENROUTER_API_KEY=sk-or-v1-...
+
+# Optional: ElevenLabs for Text-to-Speech (voice in Council Courtroom)
+ELEVENLABS_API_KEY=your-elevenlabs-key
+
+# Optional: JSON array of 5 voice IDs for [Lenin, Plato, Descartes, Nietzsche, Confucius]
+ELEVENLABS_VOICE_ID=["voice_id_1", "voice_id_2", "voice_id_3", "voice_id_4", "voice_id_5"]
 ```
 
-Get your API key at [openrouter.ai](https://openrouter.ai/). Make sure to purchase the credits you need, or sign up for automatic top up.
+**OpenRouter:** Get your API key at [openrouter.ai](https://openrouter.ai/). Purchase credits or enable automatic top-up.
+
+**ElevenLabs (Optional):** Get your API key at [elevenlabs.io](https://elevenlabs.io). Voice IDs can be found in your ElevenLabs dashboard.
 
 ### 3. Configure Models (Optional)
 
@@ -84,4 +95,5 @@ Then open http://localhost:5173 in your browser.
 - **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API
 - **Frontend:** React + Vite, react-markdown for rendering
 - **Storage:** JSON files in `data/conversations/`
+- **Text-to-Speech:** ElevenLabs API integration (optional)
 - **Package Management:** uv for Python, npm for JavaScript

@@ -1,166 +1,93 @@
-# CLAUDE.md - Technical Notes for LLM Council
+# CLAUDE.md — Project Summary & Developer Notes
 
-This file contains technical details, architectural decisions, and important implementation notes for future development sessions.
+This document describes the "LLM Council" project adapted as a philosophical council: multiple LLMs roleplay well-known historical philosophers, they critique one another, and a chairman (Lenin) synthesizes the final judgement and answer.
 
-## Project Overview
+## Purpose
+- Present users with diverse philosophical perspectives: each council member represents a famous philosopher and answers from that thinker’s viewpoint.
+- Stage 2 provides adversarial critique between philosophers, surfacing conflicts and tensions between doctrines.
+- Stage 3: Lenin (the chairman) evaluates responses and critiques, highlights errors or inconsistencies, contrasts conclusions with dialectical materialism where relevant, and produces a final answer.
 
-LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively answer user questions. The key innovation is anonymized peer review in Stage 2, preventing models from playing favorites.
+## Quick summary
+- System: 3-stage deliberation (collect → critique → synthesize).
+- Roles: council members = historical philosophers (LLMs configured with philosopher system prompts); chairman = Lenin (LLM with synthesis/critique prompt emphasizing dialectical-materialist analysis).
+- Goal: educational exploration of viewpoints and comparison with Leninist dialectical materialism.
+
+## Run (local dev)
+- Backend (FastAPI) — from project root:
+
+```bash
+python -m backend.main
+```
+
+- Frontend (Vite):
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+- Env: set `OPENROUTER_API_KEY` and any TTS keys (see `backend/config.py` and `backend/tts_config.py`).
+
+## Core flow (3 stages)
+- Stage 1 — Collect philosophers' answers:
+  - Query each philosopher-model in parallel for an answer to the user question, seeding prompts with the philosopher's persona, major works, and characteristic reasoning style.
+- Stage 2 — Philosophers critique one another:
+  - Responses are anonymized (Response A, B, ...). Each philosopher evaluates the others' arguments and points out tensions, contradictions, or historical/philosophical objections.
+  - Outputs follow a structured format to make parsing reliable (e.g., a clear "FINAL RANKING:" or "CRITIQUES:" block). Parsed critiques and extracted points are stored alongside raw text.
+- Stage 3 — Lenin synthesizes and judges:
+  - The chairman receives Stage 1 responses and Stage 2 critiques, identifies errors or useful insights, contrasts them with dialectical materialism, and produces the final answer with justification.
 
 ## Architecture
+### Backend 
+Only the primary files and their responsibilities are listed below — refer to the repository for full code.
 
-### Backend Structure (`backend/`)
+- `backend/config.py` — council/ chairman model lists and other constants, environment key names.
+- `backend/council.py` — orchestration of Stage 1, Stage 2, Stage 3; parsing and aggregation helpers.
+- `backend/openrouter.py` — helper functions to call models (single/parallel calls, error handling, timeouts).
+- `backend/storage.py` — JSON conversation persistence under `data/conversations/`.
+- `backend/main.py` — FastAPI server, route handlers, CORS settings used by the frontend.
+- `backend/system_prompt.py` — canonical persona prompts for philosophers and the Lenin chairman.
+- `backend/elevenlabs_tts.py`, `backend/tts_config.py`, `VOICE_IDS.json` — optional ElevenLabs TTS integration.
 
-**`config.py`**
-- Contains `COUNCIL_MODELS` (list of OpenRouter model identifiers)
-- Contains `CHAIRMAN_MODEL` (model that synthesizes final answer)
-- Uses environment variable `OPENROUTER_API_KEY` from `.env`
-- Backend runs on **port 8001** (NOT 8000 - user had another app on 8000)
 
-**`openrouter.py`**
-- `query_model()`: Single async model query
-- `query_models_parallel()`: Parallel queries using `asyncio.gather()`
-- Returns dict with 'content' and optional 'reasoning_details'
-- Graceful degradation: returns None on failure, continues with successful responses
+### Frontend
+- `frontend/src/api.js` — client API helpers; ensure base URL/port match backend.
+- `frontend/src/App.jsx` — main app state and conversation orchestration.
+- `frontend/src/components/Stage1.jsx` — displays each philosopher's answer.
+- `frontend/src/components/Stage2.jsx` — shows raw critiques and parsed critique/ranking extractions.
+- `frontend/src/components/Stage3.jsx` — shows Lenin's synthesized final answer.
 
-**`council.py`** - The Core Logic
-- `stage1_collect_responses()`: Parallel queries to all council models
-- `stage2_collect_rankings()`:
-  - Anonymizes responses as "Response A, B, C, etc."
-  - Creates `label_to_model` mapping for de-anonymization
-  - Prompts models to evaluate and rank (with strict format requirements)
-  - Returns tuple: (rankings_list, label_to_model_dict)
-  - Each ranking includes both raw text and `parsed_ranking` list
-- `stage3_synthesize_final()`: Chairman synthesizes from all responses + rankings
-- `parse_ranking_from_text()`: Extracts "FINAL RANKING:" section, handles both numbered lists and plain format
-- `calculate_aggregate_rankings()`: Computes average rank position across all peer evaluations
+- `data/conversations/` — persisted conversation JSON files (one per conversation).
+- `start.sh`, `README.md` — convenience and documentation.
 
-**`storage.py`**
-- JSON-based conversation storage in `data/conversations/`
-- Each conversation: `{id, created_at, messages[]}`
-- Assistant messages contain: `{role, stage1, stage2, stage3}`
-- Note: metadata (label_to_model, aggregate_rankings) is NOT persisted to storage, only returned via API
+## API & data model
+- Main route: POST `/api/conversations/{id}/message` — accepts user question and returns Stage 1 answers, Stage 2 critiques, Stage 3 synthesis, and metadata (label mappings, parsed critiques, aggregated rankings).
+- Conversation JSON: includes `id`, `created_at`, `messages[]`. Assistant messages store stage payloads; metadata is returned by the API and may be persisted if configured.
 
-**`main.py`**
-- FastAPI app with CORS enabled for localhost:5173 and localhost:3000
-- POST `/api/conversations/{id}/message` returns metadata in addition to stages
-- Metadata includes: label_to_model mapping and aggregate_rankings
+## Prompting and persona notes
+- Each philosopher gets a system/instruction prompt that encodes core doctrines, rhetorical style, and key works to emulate authentic reasoning. Prompts should be concise but contain pointers to primary emphases (e.g., "Hegel: dialectics, development of contradictions").
+- Lenin (chairman) prompt emphasizes dialectical materialism: identifying socio-historical material conditions, contradictions, and practical/political implications. Lenin's synthesis both adjudicates correctness and highlights departures from dialectical-materialist analysis.
+- Stage 2 prompts instruct philosophers to evaluate others' arguments and produce clearly parseable critique blocks (so automated parsing can extract key objections and rankings).
 
-### Frontend Structure (`frontend/src/`)
+## Parsing, aggregation, and display
+- Stage 2 outputs are kept raw for audit; the backend parses structured sections (e.g., "CRITIQUES:") into `parsed_critiques`.
+- Frontend displays raw text and parsed results side-by-side so users can verify parsing and understand differences between raw critique and automated interpretation.
 
-**`App.jsx`**
-- Main orchestration: manages conversations list and current conversation
-- Handles message sending and metadata storage
-- Important: metadata is stored in the UI state for display but not persisted to backend JSON
+## Developer notes & gotchas
+- Run backend as a module from project root: `python -m backend.main` to avoid relative import issues.
+- CORS: ensure frontend dev origin (default 5173) is allowed in `backend/main.py`.
+- Tolerate model failures: the system proceeds with available responses; Stage 3 still synthesizes from whatever inputs succeeded.
+- Ensure Stage 2 prompts are strict enough for consistent parsing; fallback regexes handle imperfect outputs but are less reliable.
 
-**`components/ChatInterface.jsx`**
-- Multiline textarea (3 rows, resizable)
-- Enter to send, Shift+Enter for new line
-- User messages wrapped in markdown-content class for padding
+## Ethics & framing
+- The system roleplays historical philosophers for educational purposes; ensure prompts and UI clarify that outputs are modeled interpretations, not historical quotations or definitive scholarship.
+- Lenin is used as a synthetic chairman persona to explore dialectical-materialist analysis — include a UI note explaining this framing and encouraging critical reading.
 
-**`components/Stage1.jsx`**
-- Tab view of individual model responses
-- ReactMarkdown rendering with markdown-content wrapper
+## Next steps & improvements
+- Add UI controls to select which philosophers are in the council and to toggle whether to show Lenin's dialectical commentary.
+- Persist label mappings for audit logs if needed.
+- Add automated unit tests for `council.parse_ranking_from_text()` and for Stage 3 synthesis prompts to ensure consistent behavior.
 
-**`components/Stage2.jsx`**
-- **Critical Feature**: Tab view showing RAW evaluation text from each model
-- De-anonymization happens CLIENT-SIDE for display (models receive anonymous labels)
-- Shows "Extracted Ranking" below each evaluation so users can validate parsing
-- Aggregate rankings shown with average position and vote count
-- Explanatory text clarifies that boldface model names are for readability only
+---
 
-**`components/Stage3.jsx`**
-- Final synthesized answer from chairman
-- Green-tinted background (#f0fff0) to highlight conclusion
-
-**Styling (`*.css`)**
-- Light mode theme (not dark mode)
-- Primary color: #4a90e2 (blue)
-- Global markdown styling in `index.css` with `.markdown-content` class
-- 12px padding on all markdown content to prevent cluttered appearance
-
-## Key Design Decisions
-
-### Stage 2 Prompt Format
-The Stage 2 prompt is very specific to ensure parseable output:
-```
-1. Evaluate each response individually first
-2. Provide "FINAL RANKING:" header
-3. Numbered list format: "1. Response C", "2. Response A", etc.
-4. No additional text after ranking section
-```
-
-This strict format allows reliable parsing while still getting thoughtful evaluations.
-
-### De-anonymization Strategy
-- Models receive: "Response A", "Response B", etc.
-- Backend creates mapping: `{"Response A": "openai/gpt-5.1", ...}`
-- Frontend displays model names in **bold** for readability
-- Users see explanation that original evaluation used anonymous labels
-- This prevents bias while maintaining transparency
-
-### Error Handling Philosophy
-- Continue with successful responses if some models fail (graceful degradation)
-- Never fail the entire request due to single model failure
-- Log errors but don't expose to user unless all models fail
-
-### UI/UX Transparency
-- All raw outputs are inspectable via tabs
-- Parsed rankings shown below raw text for validation
-- Users can verify system's interpretation of model outputs
-- This builds trust and allows debugging of edge cases
-
-## Important Implementation Details
-
-### Relative Imports
-All backend modules use relative imports (e.g., `from .config import ...`) not absolute imports. This is critical for Python's module system to work correctly when running as `python -m backend.main`.
-
-### Port Configuration
-- Backend: 8001 (changed from 8000 to avoid conflict)
-- Frontend: 5173 (Vite default)
-- Update both `backend/main.py` and `frontend/src/api.js` if changing
-
-### Markdown Rendering
-All ReactMarkdown components must be wrapped in `<div className="markdown-content">` for proper spacing. This class is defined globally in `index.css`.
-
-### Model Configuration
-Models are hardcoded in `backend/config.py`. Chairman can be same or different from council members. The current default is Gemini as chairman per user preference.
-
-## Common Gotchas
-
-1. **Module Import Errors**: Always run backend as `python -m backend.main` from project root, not from backend directory
-2. **CORS Issues**: Frontend must match allowed origins in `main.py` CORS middleware
-3. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
-4. **Missing Metadata**: Metadata is ephemeral (not persisted), only available in API responses
-
-## Future Enhancement Ideas
-
-- Configurable council/chairman via UI instead of config file
-- Streaming responses instead of batch loading
-- Export conversations to markdown/PDF
-- Model performance analytics over time
-- Custom ranking criteria (not just accuracy/insight)
-- Support for reasoning models (o1, etc.) with special handling
-
-## Testing Notes
-
-Use `test_openrouter.py` to verify API connectivity and test different model identifiers before adding to council. The script tests both streaming and non-streaming modes.
-
-## Data Flow Summary
-
-```
-User Query
-    ↓
-Stage 1: Parallel queries → [individual responses]
-    ↓
-Stage 2: Anonymize → Parallel ranking queries → [evaluations + parsed rankings]
-    ↓
-Aggregate Rankings Calculation → [sorted by avg position]
-    ↓
-Stage 3: Chairman synthesis with full context
-    ↓
-Return: {stage1, stage2, stage3, metadata}
-    ↓
-Frontend: Display with tabs + validation UI
-```
-
-The entire flow is async/parallel where possible to minimize latency.
