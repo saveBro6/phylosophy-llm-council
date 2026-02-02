@@ -12,7 +12,7 @@ When you submit a query, the system performs three stages of deliberation:
 
 1. **Stage 1: Philosophical Perspectives**. The user query is given to each philosopher-LLM individually, configured with system prompts that encode their distinctive doctrines, rhetorical style, and historical context. Responses are displayed in a tab view so users can inspect each philosopher's unique viewpoint.
 
-2. **Stage 2: Critique**. Each philosopher is presented with the anonymized responses of the others and asked to critique them—identifying tensions, contradictions, logical flaws, or historical/philosophical objections. Critiques are parsed and displayed alongside raw text for transparency.
+2. **Stage 2: Critique**. Each philosopher is presented with the responses of the others and asked to critique them—identifying tensions, contradictions, logical flaws, or historical/philosophical objections. Critiques are parsed and displayed alongside raw text for transparency.
 
 3. **Stage 3: Synthesis & Judgement**. Lenin (the chairman) receives all Stage 1 responses and Stage 2 critiques, identifies errors and insights, contrasts them with dialectical materialism, and produces the final answer with reasoned justification.
 
