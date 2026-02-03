@@ -19,7 +19,7 @@ except Exception:  # pragma: no cover - defensive if package missing
 
 logger = logging.getLogger("backend.elevenlabs_tts")
 
-TTS_MODEL_ID = "eleven_multilingual_v2"
+TTS_MODEL_ID = "eleven_v3"      #or eleven_turbo_v2_5
 MAX_TEXT_LENGTH = 5000
 
 
